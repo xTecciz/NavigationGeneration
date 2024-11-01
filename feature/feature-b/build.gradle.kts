@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    id("com.google.devtools.ksp") version "2.0.21-1.0.26"
 }
 
 android {
@@ -42,4 +43,6 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 
     implementation(project(":core:navigation:feature-launcher-api"))
+
+    ksp(project(":core:navigation:navigation-processor"))
 }

@@ -1,6 +1,5 @@
 package com.example.navigation_processor
 
-import com.example.navigation_annotation.FeatureLauncherApiAnnotation
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.KSPLogger
@@ -10,10 +9,7 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
-import com.squareup.kotlinpoet.PropertySpec
-import com.squareup.kotlinpoet.TypeSpec
-import java.io.IOException
-
+import com.squareup.kotlinpoet.*
 
 class FeatureProcessor(
     private val codeGenerator: CodeGenerator,
@@ -23,60 +19,78 @@ class FeatureProcessor(
     override fun process(resolver: Resolver): List<KSAnnotated> {
         logger.warn("FeatureProcessor is running...")
 
-        // Получаем все символы, аннотированные @FeatureLauncherApiAnnotation
         val symbols = resolver.getSymbolsWithAnnotation("com.example.navigation_annotation.FeatureLauncherApiAnnotation")
-        symbols.forEach { symbol ->
-            if (symbol is KSClassDeclaration) {
-                // Логируем, если символ является классом или интерфейсом
-                logger.warn("Found class or interface: ${symbol.simpleName.asString()} of type: ${symbol::class.simpleName}")
-            } else {
-                // Логируем символы других типов для отладки
-                logger.warn("Found non-class symbol: ${symbol::class.simpleName}")
-            }
-        }
-
         val featureInterfaces = symbols.filterIsInstance<KSClassDeclaration>().toList()
+
         if (featureInterfaces.isEmpty()) {
             logger.warn("No annotated interfaces found.")
             return emptyList()
         }
 
-        logger.warn("Generating FeatureGraph with ${featureInterfaces.size} features.")
+        logger.warn("Generating conversionGraph with ${featureInterfaces.size} features.")
 
-        // Подготовка к генерации класса графа
-        val fileSpecBuilder = FileSpec.builder("com.example.generated", "FeatureGraph")
-        val classBuilder = TypeSpec.objectBuilder("FeatureGraph")
+        // Подготовка файла для генерации
+        val fileSpecBuilder = FileSpec.builder("com.example.generated", "FeatureGraphExtensions")
 
-        // Создание свойств для каждого аннотированного интерфейса
+        // Создание функции conversionGraph
+        val funcSpecBuilder = FunSpec.builder("conversionGraph")
+            .receiver(ClassName("androidx.navigation", "NavGraphBuilder"))
+            .addModifiers(KModifier.INTERNAL)
+            .addParameter("startDestination", ClassName("com.example.navigation", "NavigationRoute"))
+            .addParameter("navHostController", ClassName("androidx.navigation", "NavHostController"))
+            .addParameter("exitFlow", LambdaTypeName.get(returnType = Unit::class.asTypeName()))
+
+        // Добавляем в тело функции каждый найденный интерфейс как лончер
         featureInterfaces.forEach { feature ->
             val featureName = feature.simpleName.asString().replaceFirstChar { it.lowercase() }
-            val propertySpec = PropertySpec.builder(featureName, feature.toClassName())
-                .initializer("%T()", feature.toClassName())
-                .build()
-            classBuilder.addProperty(propertySpec)
+            val className = feature.toClassName()
+
+            // Добавляем строку для получения экземпляра лончера
+            funcSpecBuilder.addStatement("val %L: %T = getKoin().get()", featureName, className)
         }
 
-        // Добавляем сгенерированный класс в файл
-        fileSpecBuilder.addType(classBuilder.build())
+        // Добавляем вызов navigation и register для каждого лончера
+        funcSpecBuilder.addCode(
+            """
+            navigation<ConversionGraphRoute>(
+                startDestination = startDestination
+            ) {
+            """.trimIndent()
+        )
 
-        // Запись сгенерированного кода в файл
-        try {
-            codeGenerator.createNewFile(
-                dependencies = Dependencies(aggregating = true),
-                packageName = "com.example.generated",
-                fileName = "FeatureGraph"
-            ).use { stream ->
-                stream.writer().use { writer ->
-                    fileSpecBuilder.build().writeTo(writer)
-                }
+        featureInterfaces.forEach { feature ->
+            val featureName = feature.simpleName.asString().replaceFirstChar { it.lowercase() }
+            funcSpecBuilder.addCode(
+                """
+                register(
+                    featureLauncherApi = $featureName,
+                    navController = navHostController,
+                    exitFlow = exitFlow
+                )
+                """.trimIndent()
+            )
+        }
+
+        funcSpecBuilder.addCode("}")
+
+        // Добавляем сгенерированную функцию в файл
+        fileSpecBuilder.addFunction(funcSpecBuilder.build())
+
+        // Записываем файл
+        codeGenerator.createNewFile(
+            dependencies = Dependencies(aggregating = true),
+            packageName = "com.example.generated",
+            fileName = "FeatureGraphExtensions"
+        ).use { stream ->
+            stream.writer().use { writer ->
+                fileSpecBuilder.build().writeTo(writer)
             }
-        } catch (e: IOException) {
-            logger.warn("File already exists or could not be created: ${e.message}")
         }
 
         return emptyList()
     }
 }
+
 
 // Функция для получения ClassName из KSClassDeclaration
 fun KSClassDeclaration.toClassName(): ClassName {
