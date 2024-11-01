@@ -1,7 +1,6 @@
 package com.example.feature_b
 
 import com.example.feature_laucnher_api.FeatureLauncherApi
-import com.example.navigation_annotation.FeatureLauncherApiAnnotation
 
-@FeatureLauncherApiAnnotation
+@com.example.navigation_annotation.FeatureLauncherApiAnnotation
 interface FeatureBLauncher : FeatureLauncherApi
