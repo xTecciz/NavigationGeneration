@@ -34,6 +34,9 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.navigation.common.ktx)
+    implementation(libs.androidx.navigation.runtime.ktx)
+    implementation(project(":core:navigation:feature-launcher-api"))
     ksp(project(":core:navigation:navigation-processor"))
     implementation(project(":core:navigation:navigation-annotation"))
     implementation(project(":feature:feature-a"))

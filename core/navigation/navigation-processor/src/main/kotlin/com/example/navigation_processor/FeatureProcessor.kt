@@ -1,5 +1,7 @@
 package com.example.navigation_processor
 
+import com.example.navigation_annotation.FeatureLauncherApiAnnotation
+import com.example.navigation_annotation.GenerateNavigationGraph
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.KSPLogger
@@ -19,15 +21,37 @@ class FeatureProcessor(
     override fun process(resolver: Resolver): List<KSAnnotated> {
         logger.warn("FeatureProcessor is running...")
 
-        val symbols = resolver.getSymbolsWithAnnotation("com.example.navigation_annotation.FeatureLauncherApiAnnotation")
-        val featureInterfaces = symbols.filterIsInstance<KSClassDeclaration>().toList()
+        // Находим все аннотированные классы с @GenerateNavigationGraph
+        val targetModuleSymbols = resolver.getSymbolsWithAnnotation(GenerateNavigationGraph::class.qualifiedName!!)
+            .filterIsInstance<KSClassDeclaration>()
+            .toList()
 
-        if (featureInterfaces.isEmpty()) {
-            logger.warn("No annotated interfaces found.")
+        if (targetModuleSymbols.isEmpty()) {
+            logger.warn("No @GenerateNavigationGraph annotation found to determine generation module.")
+            return emptyList()
+        } else {
+            targetModuleSymbols.forEach { symbol ->
+                logger.warn("Found @GenerateNavigationGraph annotation on: ${symbol.simpleName.asString()}")
+            }
+        }
+        logger.warn("FeatureProcessor is running...")
+
+        // Находим все интерфейсы с аннотацией @FeatureLauncherApiAnnotation
+        val featureSymbols = resolver.getSymbolsWithAnnotation(FeatureLauncherApiAnnotation::class.qualifiedName!!)
+            .filterIsInstance<KSClassDeclaration>()
+            .toList()
+
+        if (featureSymbols.isEmpty()) {
+            logger.warn("No annotated feature interfaces found.")
             return emptyList()
         }
 
-        logger.warn("Generating conversionGraph with ${featureInterfaces.size} features.")
+        if (targetModuleSymbols.isEmpty()) {
+            logger.warn("No @GenerateNavigationGraph annotation found to determine generation module.")
+            return emptyList()
+        }
+
+        logger.warn("Generating conversionGraph with ${featureSymbols.size} features in target module.")
 
         // Подготовка файла для генерации
         val fileSpecBuilder = FileSpec.builder("com.example.generated", "FeatureGraphExtensions")
@@ -41,7 +65,7 @@ class FeatureProcessor(
             .addParameter("exitFlow", LambdaTypeName.get(returnType = Unit::class.asTypeName()))
 
         // Добавляем в тело функции каждый найденный интерфейс как лончер
-        featureInterfaces.forEach { feature ->
+        featureSymbols.forEach { feature ->
             val featureName = feature.simpleName.asString().replaceFirstChar { it.lowercase() }
             val className = feature.toClassName()
 
@@ -52,21 +76,25 @@ class FeatureProcessor(
         // Добавляем вызов navigation и register для каждого лончера
         funcSpecBuilder.addCode(
             """
+                
             navigation<ConversionGraphRoute>(
                 startDestination = startDestination
             ) {
+            
             """.trimIndent()
         )
 
-        featureInterfaces.forEach { feature ->
+        featureSymbols.forEach { feature ->
             val featureName = feature.simpleName.asString().replaceFirstChar { it.lowercase() }
             funcSpecBuilder.addCode(
                 """
+                    
                 register(
                     featureLauncherApi = $featureName,
                     navController = navHostController,
                     exitFlow = exitFlow
                 )
+                
                 """.trimIndent()
             )
         }
@@ -76,7 +104,7 @@ class FeatureProcessor(
         // Добавляем сгенерированную функцию в файл
         fileSpecBuilder.addFunction(funcSpecBuilder.build())
 
-        // Записываем файл
+        // Записываем файл в модуль, содержащий класс с аннотацией @GenerateNavigationGraph
         codeGenerator.createNewFile(
             dependencies = Dependencies(aggregating = true),
             packageName = "com.example.generated",
@@ -90,6 +118,7 @@ class FeatureProcessor(
         return emptyList()
     }
 }
+
 
 
 // Функция для получения ClassName из KSClassDeclaration

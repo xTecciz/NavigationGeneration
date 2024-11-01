@@ -14,6 +14,8 @@ composeNavigation = "2.8.1"
 kotlinPoet = "1.12.0"
 ksp = "2.0.21-1.0.26"
 symbolProcessingApi = "2.0.21-1.0.26"
+navigationCommonKtx = "2.8.3"
+navigationRuntimeKtx = "2.8.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -37,6 +39,8 @@ compose-navigation = { group = "androidx.navigation", name = "navigation-compose
 ksp = { group = "com.google.devtools.ksp", name = "ksp", version.ref = "ksp" }
 kotlinpoet-ksp = { group = "com.squareup", name = "kotlinpoet-ksp", version.ref = "ksp" }
 symbol-processing-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "symbolProcessingApi" }
+androidx-navigation-common-ktx = { group = "androidx.navigation", name = "navigation-common-ktx", version.ref = "navigationCommonKtx" }
+androidx-navigation-runtime-ktx = { group = "androidx.navigation", name = "navigation-runtime-ktx", version.ref = "navigationRuntimeKtx" }
 
 
 [plugins]

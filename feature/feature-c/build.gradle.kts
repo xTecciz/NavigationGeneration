@@ -43,6 +43,5 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 
     implementation(project(":core:navigation:feature-launcher-api"))
-
     ksp(project(":core:navigation:navigation-processor"))
 }

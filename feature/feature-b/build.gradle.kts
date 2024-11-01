@@ -44,5 +44,6 @@ dependencies {
 
     implementation(project(":core:navigation:feature-launcher-api"))
 
+    implementation(libs.compose.navigation)
     ksp(project(":core:navigation:navigation-processor"))
 }
